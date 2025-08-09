@@ -1,0 +1,100 @@
+package handlers
+
+import (
+	"encoding/json"
+	"fmt"
+	"github.com/Aleksei-D/go-loyalty-system/internal/service"
+	"github.com/Aleksei-D/go-loyalty-system/pkg/utils/common"
+	"io"
+	"net/http"
+)
+
+type OrderHandlers struct {
+	orderService *service.OrderService
+}
+
+func NewOrderHandler(orderService *service.OrderService) *OrderHandlers {
+	return &OrderHandlers{orderService: orderService}
+}
+
+func (o *OrderHandlers) ApiAddOrdersHandler() func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		buf, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer r.Body.Close()
+
+		orderNumber := string(buf)
+		login, _ := r.Context().Value("login").(string)
+
+		if ok := common.CheckLuhnAlgorithm(orderNumber); !ok {
+			http.Error(w, "Invalid order number", http.StatusUnprocessableEntity)
+			return
+		}
+
+		existOrder, exists := o.orderService.GetOrderByNumber(r.Context(), orderNumber)
+		if exists {
+			if *existOrder.Login == login {
+				existOrderJson, err := json.Marshal(existOrder)
+				if err != nil {
+					http.Error(w, "invalid marshaling", http.StatusInternalServerError)
+					return
+				}
+
+				w.Header().Set("Content-Type", "service/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write(existOrderJson)
+				return
+			}
+
+			if *existOrder.Login != login {
+				http.Error(w, fmt.Sprintf("Wrong OrderNumber %s", orderNumber), http.StatusConflict)
+				return
+			}
+		}
+
+		addedOrder, err := o.orderService.Add(r.Context(), login, orderNumber)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		addedOrderJson, err := json.Marshal(addedOrder)
+		if err != nil {
+			http.Error(w, "invalid marshaling", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "service/json")
+		w.WriteHeader(http.StatusAccepted)
+		w.Write(addedOrderJson)
+	}
+}
+
+func (o *OrderHandlers) ApiGetOrdersHandler() func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		login, _ := r.Context().Value("login").(string)
+
+		orders, err := o.orderService.GetAllByLogin(r.Context(), login)
+		if len(orders) == 0 {
+			http.Error(w, "Orders if not load", http.StatusNoContent)
+			return
+		}
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		ordersJson, err := json.Marshal(orders)
+		if err != nil {
+			http.Error(w, "invalid marshaling", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "service/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(ordersJson)
+	}
+}
