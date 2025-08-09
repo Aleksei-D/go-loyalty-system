@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"github.com/Aleksei-D/go-loyalty-system/pkg/utils/common"
 	"github.com/golang-jwt/jwt/v5"
 	"net/http"
 	"strings"
@@ -39,7 +40,7 @@ func AuthMiddleware(secretKey string) func(http.Handler) http.Handler {
 
 			if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 				login := claims["login"].(string)
-				ctx := context.WithValue(r.Context(), "login", login)
+				ctx := context.WithValue(r.Context(), common.LoginKey("login"), login)
 				next.ServeHTTP(w, r.WithContext(ctx))
 			} else {
 				http.Error(w, "Invalid token claims", http.StatusUnauthorized)

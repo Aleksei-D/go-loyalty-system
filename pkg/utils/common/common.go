@@ -2,6 +2,12 @@ package common
 
 import "strconv"
 
+type LoginKey string
+
+func (c LoginKey) String() string {
+	return string(c)
+}
+
 func CheckLuhnAlgorithm(orderNumber string) bool {
 	sum := 0
 	double := false

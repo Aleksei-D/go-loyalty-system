@@ -22,12 +22,8 @@ func (o *OrderService) Add(ctx context.Context, login, orderNumber string) (*mod
 	return o.orderRepo.Add(ctx, login, orderNumber)
 }
 
-func (o *OrderService) GetOrderByNumber(ctx context.Context, orderNumber string) (*models.Order, bool) {
+func (o *OrderService) GetOrderByNumber(ctx context.Context, orderNumber string) (*models.Order, error) {
 	return o.orderRepo.GetOrderByNumber(ctx, orderNumber)
-}
-
-func (o *OrderService) GetOrderByLoginAndNumber(ctx context.Context, login, orderNumber string) (*models.Order, bool) {
-	return o.orderRepo.GetOrderByLoginAndNumber(ctx, login, orderNumber)
 }
 
 func (o *OrderService) GetNotAcceptedOrderNumbers(ctx context.Context, limit uint) ([]*models.Order, error) {
@@ -36,4 +32,8 @@ func (o *OrderService) GetNotAcceptedOrderNumbers(ctx context.Context, limit uin
 
 func (o *OrderService) UpdateStatus(ctx context.Context, order *models.Order) error {
 	return o.orderRepo.UpdateStatus(ctx, order)
+}
+
+func (o *OrderService) IsExist(ctx context.Context, orderNumber string) (bool, error) {
+	return o.orderRepo.IsExist(ctx, orderNumber)
 }

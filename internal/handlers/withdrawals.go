@@ -17,7 +17,7 @@ func NewWithdrawHandler(s *service.WithdrawalService) *WithdrawHandlers {
 	return &WithdrawHandlers{ws: s}
 }
 
-func (wh *WithdrawHandlers) ApiWithdrawHandler() func(http.ResponseWriter, *http.Request) {
+func (wh *WithdrawHandlers) APIWithdrawHandler() func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var withdrawal models.Withdrawal
 		buf, err := io.ReadAll(r.Body)
@@ -31,28 +31,36 @@ func (wh *WithdrawHandlers) ApiWithdrawHandler() func(http.ResponseWriter, *http
 			return
 		}
 
-		if ok := common.CheckLuhnAlgorithm(*withdrawal.OrderNumber); !ok {
+		if ok := common.CheckLuhnAlgorithm(withdrawal.OrderNumber); !ok {
 			http.Error(w, "Invalid order number", http.StatusUnprocessableEntity)
 			return
 		}
 
-		login, _ := r.Context().Value("login").(string)
-		withdrawal.Login = &login
+		login, ok := r.Context().Value(common.LoginKey("login")).(string)
+		if !ok {
+			http.Error(w, "Not authorized", http.StatusUnauthorized)
+			return
+		}
 
+		withdrawal.Login = login
 		err = wh.ws.Withdraw(r.Context(), &withdrawal)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusPaymentRequired)
 		}
 
-		w.Header().Set("Content-Type", "service/json")
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 }
 
-func (wh *WithdrawHandlers) ApiGetWithdrawalsHandler() func(http.ResponseWriter, *http.Request) {
+func (wh *WithdrawHandlers) APIGetWithdrawalsHandler() func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		login, _ := r.Context().Value("login").(string)
+		login, ok := r.Context().Value(common.LoginKey("login")).(string)
+		if !ok {
+			http.Error(w, "Not authorized", http.StatusUnauthorized)
+			return
+		}
 
 		withdrawals, err := wh.ws.GetAllByLogin(r.Context(), login)
 		if len(withdrawals) == 0 {
@@ -64,14 +72,14 @@ func (wh *WithdrawHandlers) ApiGetWithdrawalsHandler() func(http.ResponseWriter,
 			return
 		}
 
-		ordersJson, err := json.Marshal(withdrawals)
+		ordersJSON, err := json.Marshal(withdrawals)
 		if err != nil {
 			http.Error(w, "invalid marshaling", http.StatusInternalServerError)
 			return
 		}
 
-		w.Header().Set("Content-Type", "service/json")
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(ordersJson)
+		w.Write(ordersJSON)
 	}
 }

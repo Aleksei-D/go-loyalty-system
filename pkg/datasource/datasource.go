@@ -5,8 +5,8 @@ import (
 	_ "github.com/lib/pq"
 )
 
-func NewDatabase(databaseUri string) (*sql.DB, error) {
-	db, err := sql.Open("postgres", databaseUri)
+func NewDatabase(databaseURI string) (*sql.DB, error) {
+	db, err := sql.Open("postgres", databaseURI)
 	if err != nil {
 		return nil, err
 	}

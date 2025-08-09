@@ -8,8 +8,8 @@ import (
 )
 
 func NewRouter(service *service.Service, secretKey string) chi.Router {
-	userApiHandlers := handlers.NewUserHandlers(service.UserService, secretKey)
-	orderApiHandlers := handlers.NewOrderHandler(service.OrderService)
+	userAPIHandlers := handlers.NewUserHandlers(service.UserService, secretKey)
+	orderAPIHandlers := handlers.NewOrderHandler(service.OrderService)
 	withdrawHandlers := handlers.NewWithdrawHandler(service.WithdrawalService)
 	balanceHandlers := handlers.NewBalanceHandler(service.BalanceService)
 
@@ -17,24 +17,24 @@ func NewRouter(service *service.Service, secretKey string) chi.Router {
 
 	r.Route("/api/user", func(r chi.Router) {
 		r.Use(middleware.CompressMiddleware)
-		r.Post("/register", userApiHandlers.ApiUserRegisterHandler())
-		r.Post("/login", userApiHandlers.ApiUserLoginHandler())
+		r.Post("/register", userAPIHandlers.APIUserRegisterHandler())
+		r.Post("/login", userAPIHandlers.APIUserLoginHandler())
 
 		r.Route("/orders", func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(secretKey))
-			r.Get("", orderApiHandlers.ApiGetOrdersHandler())
-			r.Post("", orderApiHandlers.ApiAddOrdersHandler())
+			r.Get("/", orderAPIHandlers.APIGetOrdersHandler())
+			r.Post("/", orderAPIHandlers.APIAddOrdersHandler())
 		})
 
 		r.Route("/balance", func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(secretKey))
-			r.Get("", balanceHandlers.ApiGetBalanceHandler())
-			r.Post("/withdraw", withdrawHandlers.ApiWithdrawHandler())
+			r.Get("/", balanceHandlers.APIGetBalanceHandler())
+			r.Post("/withdraw", withdrawHandlers.APIWithdrawHandler())
 		})
 
 		r.Route("/withdraws", func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(secretKey))
-			r.Get("", withdrawHandlers.ApiGetWithdrawalsHandler())
+			r.Get("/", withdrawHandlers.APIGetWithdrawalsHandler())
 		})
 	})
 	return r

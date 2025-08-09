@@ -114,7 +114,7 @@ func (o *OrdersAgent) getOrdersStatus(ctx context.Context, doneCh chan struct{},
 	case <-doneCh:
 		return
 	case orderRes := <-orderCh:
-		res := o.httpClient.getOrderStatus(*orderRes.Order.Number)
+		res := o.httpClient.getOrderStatus(orderRes.Order.Number)
 		if res.Err != nil {
 			logger.Log.Warn(res.Err.Error())
 		}

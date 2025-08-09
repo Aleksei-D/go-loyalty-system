@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const acceptedOrderUrl = "/api/orders/"
+const acceptedOrderURL = "/api/orders/"
 
 type StatusUpdaterClient struct {
 	*http.Client
@@ -71,7 +71,7 @@ func (rr retryRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 func (s *StatusUpdaterClient) getOrderStatus(orderNumber string) models.OrderResult {
 	var result models.OrderResult
 	var order *models.Order
-	url := fmt.Sprintf("%s%s%s", s.url, acceptedOrderUrl, orderNumber)
+	url := fmt.Sprintf("%s%s%s", s.url, acceptedOrderURL, orderNumber)
 	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(nil))
 	if err != nil {
 		result.Err = err

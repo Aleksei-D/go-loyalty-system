@@ -17,7 +17,7 @@ func NewOrderHandler(orderService *service.OrderService) *OrderHandlers {
 	return &OrderHandlers{orderService: orderService}
 }
 
-func (o *OrderHandlers) ApiAddOrdersHandler() func(http.ResponseWriter, *http.Request) {
+func (o *OrderHandlers) APIAddOrdersHandler() func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		buf, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -27,55 +27,56 @@ func (o *OrderHandlers) ApiAddOrdersHandler() func(http.ResponseWriter, *http.Re
 		defer r.Body.Close()
 
 		orderNumber := string(buf)
-		login, _ := r.Context().Value("login").(string)
+		login, ok := r.Context().Value(common.LoginKey("login")).(string)
+		if !ok {
+			http.Error(w, "Not authorized", http.StatusUnauthorized)
+			return
+		}
 
 		if ok := common.CheckLuhnAlgorithm(orderNumber); !ok {
 			http.Error(w, "Invalid order number", http.StatusUnprocessableEntity)
 			return
 		}
 
-		existOrder, exists := o.orderService.GetOrderByNumber(r.Context(), orderNumber)
-		if exists {
-			if *existOrder.Login == login {
-				existOrderJson, err := json.Marshal(existOrder)
-				if err != nil {
-					http.Error(w, "invalid marshaling", http.StatusInternalServerError)
-					return
-				}
-
-				w.Header().Set("Content-Type", "service/json")
+		ok, err = o.orderService.IsExist(r.Context(), orderNumber)
+		if err != nil {
+			http.Error(w, "adding order error", http.StatusInternalServerError)
+			return
+		}
+		if ok {
+			existOrder, err := o.orderService.GetOrderByNumber(r.Context(), orderNumber)
+			if err != nil {
+				http.Error(w, "adding order error", http.StatusInternalServerError)
+				return
+			}
+			if existOrder.Login == login {
 				w.WriteHeader(http.StatusOK)
-				w.Write(existOrderJson)
 				return
 			}
 
-			if *existOrder.Login != login {
+			if existOrder.Login != login {
 				http.Error(w, fmt.Sprintf("Wrong OrderNumber %s", orderNumber), http.StatusConflict)
 				return
 			}
 		}
 
-		addedOrder, err := o.orderService.Add(r.Context(), login, orderNumber)
+		_, err = o.orderService.Add(r.Context(), login, orderNumber)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, "adding order error", http.StatusInternalServerError)
 			return
 		}
 
-		addedOrderJson, err := json.Marshal(addedOrder)
-		if err != nil {
-			http.Error(w, "invalid marshaling", http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "service/json")
 		w.WriteHeader(http.StatusAccepted)
-		w.Write(addedOrderJson)
 	}
 }
 
-func (o *OrderHandlers) ApiGetOrdersHandler() func(http.ResponseWriter, *http.Request) {
+func (o *OrderHandlers) APIGetOrdersHandler() func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		login, _ := r.Context().Value("login").(string)
+		login, ok := r.Context().Value(common.LoginKey("login")).(string)
+		if !ok {
+			http.Error(w, "Not authorized", http.StatusUnauthorized)
+			return
+		}
 
 		orders, err := o.orderService.GetAllByLogin(r.Context(), login)
 		if len(orders) == 0 {
@@ -87,14 +88,14 @@ func (o *OrderHandlers) ApiGetOrdersHandler() func(http.ResponseWriter, *http.Re
 			return
 		}
 
-		ordersJson, err := json.Marshal(orders)
+		ordersJSON, err := json.Marshal(orders)
 		if err != nil {
 			http.Error(w, "invalid marshaling", http.StatusInternalServerError)
 			return
 		}
 
-		w.Header().Set("Content-Type", "service/json")
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(ordersJson)
+		w.Write(ordersJSON)
 	}
 }

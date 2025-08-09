@@ -20,8 +20,8 @@ func NewPostgresOrderRepository(db *sql.DB) *PostgresOrderRepository {
 	return &PostgresOrderRepository{db: db}
 }
 
-func (p *PostgresOrderRepository) Add(ctx context.Context, orderNumber, login string) (*models.Order, error) {
-	var order *models.Order
+func (p *PostgresOrderRepository) Add(ctx context.Context, login, orderNumber string) (*models.Order, error) {
+	var order models.Order
 	var status string
 	var accrual sql.NullFloat64
 	var loginFromDB string
@@ -30,40 +30,43 @@ func (p *PostgresOrderRepository) Add(ctx context.Context, orderNumber, login st
 
 	row := p.db.QueryRowContext(
 		ctx,
-		"INSERT INTO order (orderNumber, login) VALUES ($1, $2) RETURNING login, orderNumber, status, accrual, uploaded_at",
+		"INSERT INTO orders (number, login) VALUES ($1, $2) RETURNING login, number, status, accrual, uploaded_at",
 		orderNumber,
 		login,
 	)
 	if err := row.Err(); err != nil {
 		logger.Log.Info(err.Error(), zap.Error(err))
-		return order, err
+		return &order, err
 	}
 
 	err := row.Scan(&loginFromDB, &orderNumberFromDB, &status, &accrual, &uploadedAt)
 	if err != nil {
 		logger.Log.Info(err.Error(), zap.Error(err))
-		return order, err
+		return &order, err
 	}
 
 	if accrual.Valid {
 		order.Accrual = &accrual.Float64
 	}
-	order.Login = &loginFromDB
-	order.Status = &status
-	order.Number = &orderNumberFromDB
-	order.UploadedAt = &models.CustomTime{Time: uploadedAt}
-	return order, nil
+	order.Login = loginFromDB
+	order.Status = status
+	order.Number = orderNumberFromDB
+	order.UploadedAt = models.CustomTime{Time: uploadedAt}
+	return &order, nil
 }
 
 func (p *PostgresOrderRepository) GetAllByLogin(ctx context.Context, login string) ([]*models.Order, error) {
-	var orders []*models.Order
+	orders := make([]*models.Order, 0)
 	rows, err := p.db.QueryContext(
 		ctx,
-		"SELECT status, number, accrual, uploaded_at FROM order WHERE login = $1 ORDER BY uploaded_at DESC",
+		"SELECT status, number, accrual, uploaded_at FROM orders WHERE login = $1 ORDER BY uploaded_at DESC",
 		login,
 	)
+	if rows.Err() != nil {
+		return orders, err
+	}
 	if err != nil {
-		if errors.Is(sql.ErrNoRows, err) {
+		if errors.Is(err, sql.ErrNoRows) {
 			logger.Log.Info(err.Error(), zap.Error(err))
 			return orders, nil
 		}
@@ -76,7 +79,7 @@ func (p *PostgresOrderRepository) GetAllByLogin(ctx context.Context, login strin
 		var accrual sql.NullFloat64
 		var uploadedAt time.Time
 		var number string
-		var order *models.Order
+		var order models.Order
 		err := rows.Scan(&status, &number, &accrual, &uploadedAt)
 		if err != nil {
 			return orders, err
@@ -85,97 +88,57 @@ func (p *PostgresOrderRepository) GetAllByLogin(ctx context.Context, login strin
 		if accrual.Valid {
 			order.Accrual = &accrual.Float64
 		}
-		order.Number = &number
-		order.UploadedAt = &models.CustomTime{Time: uploadedAt}
-		order.Status = &status
-		order.Login = &login
-		orders = append(orders, order)
+		order.Number = number
+		order.UploadedAt = models.CustomTime{Time: uploadedAt}
+		order.Status = status
+		order.Login = login
+		orders = append(orders, &order)
 	}
 	return orders, nil
 }
 
-func (p *PostgresOrderRepository) GetOrderByNumber(ctx context.Context, orderNumber string) (*models.Order, bool) {
-	var order *models.Order
+func (p *PostgresOrderRepository) GetOrderByNumber(ctx context.Context, orderNumber string) (*models.Order, error) {
+	var order models.Order
 	var status string
 	var accrual sql.NullFloat64
 	var login string
 	var orderFromDB string
 	var uploadedAt time.Time
-	row := p.db.QueryRowContext(
+	err := p.db.QueryRowContext(
 		ctx,
-		"SELECT login, number, status, accrual, uploaded_at FROM order WHERE number = $1",
+		"SELECT login, number, status, accrual, uploaded_at FROM orders WHERE number = $1",
 		orderNumber,
-	)
-
-	if err := row.Err(); err != nil {
-		if errors.Is(sql.ErrNoRows, row.Err()) {
-			logger.Log.Info(fmt.Sprintf("order - %s not found", orderNumber), zap.Error(err))
-			return order, false
-		}
-		return order, false
-	}
-
-	err := row.Scan(&login, &orderFromDB, &status, &accrual, &uploadedAt)
+	).Scan(&login, &orderFromDB, &status, &accrual, &uploadedAt)
 	if err != nil {
-		return order, false
+		if errors.Is(err, sql.ErrNoRows) {
+			logger.Log.Info(fmt.Sprintf("order - %s not found", orderNumber), zap.Error(err))
+			return nil, err
+		}
+		return &order, err
 	}
 
 	if accrual.Valid {
 		order.Accrual = &accrual.Float64
 	}
-	order.Number = &orderFromDB
-	order.UploadedAt = &models.CustomTime{Time: uploadedAt}
-	order.Status = &status
-	order.Login = &login
-	return order, true
-}
-
-func (p *PostgresOrderRepository) GetOrderByLoginAndNumber(ctx context.Context, login, orderNumber string) (*models.Order, bool) {
-	var order *models.Order
-	var status string
-	var accrual sql.NullFloat64
-	var loginFromDB string
-	var uploadedAt time.Time
-	var orderNumberFromDB string
-	row := p.db.QueryRowContext(
-		ctx,
-		"SELECT login, number, status, accrual, uploaded_at FROM order WHERE number = $1 AND login = $2",
-		orderNumber,
-		login,
-	)
-
-	if err := row.Err(); err != nil {
-		if errors.Is(sql.ErrNoRows, row.Err()) {
-			logger.Log.Info(fmt.Sprintf("order - %s not found", orderNumber), zap.Error(err))
-			return order, false
-		}
-		return order, false
-	}
-
-	err := row.Scan(&loginFromDB, &orderNumberFromDB, &status, &accrual, &uploadedAt)
-	if err != nil {
-		return order, false
-	}
-
-	if accrual.Valid {
-		order.Accrual = &accrual.Float64
-	}
-	order.Number = &orderNumberFromDB
-	order.UploadedAt = &models.CustomTime{Time: uploadedAt}
-	order.Status = &status
-	order.Login = &loginFromDB
-	return order, true
+	order.Number = orderFromDB
+	order.UploadedAt = models.CustomTime{Time: uploadedAt}
+	order.Status = status
+	order.Login = login
+	return &order, nil
 }
 
 func (p *PostgresOrderRepository) GetNotAcceptedOrderNumbers(ctx context.Context, limit uint) ([]*models.Order, error) {
-	var orders []*models.Order
+	orders := make([]*models.Order, 0)
 	rows, err := p.db.QueryContext(
 		ctx,
-		"SELECT number FROM order WHERE status = ANY($1) limit $2",
+		"SELECT number FROM orders WHERE status = ANY($1) limit $2",
 		pq.Array([]string{models.OrderStatusNew, models.OrderStatusProcessing}),
 		limit,
 	)
 	if err != nil {
+		return orders, err
+	}
+	if rows.Err() != nil {
 		return orders, err
 	}
 	defer rows.Close()
@@ -187,7 +150,7 @@ func (p *PostgresOrderRepository) GetNotAcceptedOrderNumbers(ctx context.Context
 			return orders, err
 		}
 
-		orders = append(orders, &models.Order{Number: &number})
+		orders = append(orders, &models.Order{Number: number})
 	}
 	return orders, nil
 }
@@ -195,7 +158,7 @@ func (p *PostgresOrderRepository) GetNotAcceptedOrderNumbers(ctx context.Context
 func (p *PostgresOrderRepository) UpdateStatus(ctx context.Context, order *models.Order) error {
 	_, err := p.db.ExecContext(
 		ctx,
-		"UPDATE order SET status = $1, accrual = $2 WHERE number = $3",
+		"UPDATE orders SET status = $1, accrual = $2 WHERE number = $3",
 		order.Status,
 		order.Accrual,
 		order.Number,
@@ -204,4 +167,17 @@ func (p *PostgresOrderRepository) UpdateStatus(ctx context.Context, order *model
 		return err
 	}
 	return nil
+}
+
+func (p *PostgresOrderRepository) IsExist(ctx context.Context, orderNumber string) (bool, error) {
+	var status string
+	err := p.db.QueryRowContext(ctx, "SELECT number FROM orders WHERE number = $1", orderNumber).Scan(&status)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			logger.Log.Info(fmt.Sprintf("order - %s not found", orderNumber), zap.Error(err))
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }

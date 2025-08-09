@@ -3,7 +3,11 @@ package infrastructure
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
+	"github.com/Aleksei-D/go-loyalty-system/internal/logger"
 	"github.com/Aleksei-D/go-loyalty-system/internal/models"
+	"go.uber.org/zap"
 )
 
 type PostgresBalanceRepository struct {
@@ -15,21 +19,35 @@ func NewPostgresBalanceRepository(db *sql.DB) *PostgresBalanceRepository {
 }
 
 func (p *PostgresBalanceRepository) Get(ctx context.Context, login string) (*models.Balance, error) {
-	var balance *models.Balance
+	var balance models.Balance
 	var current float64
 	var withdrawn float64
-	var loginFromDB string
-	row := p.db.QueryRowContext(ctx, "SELECT b.login, b.current, SUM(w.sum) as withdrawns FROM balance as b JOIN withdrawal as w ON b.login = w.login WHERE b.login = $1 GROUP BY b.login", login)
-	if err := row.Err(); err != nil {
-		return balance, err
+	tx, err := p.db.Begin()
+	if err != nil {
+		return nil, err
 	}
 
-	err := row.Scan(&loginFromDB, &current, &withdrawn)
+	err = tx.QueryRowContext(ctx, "SELECT current FROM balance WHERE login = $1", login).Scan(&current)
 	if err != nil {
-		return balance, err
+		if errors.Is(err, sql.ErrNoRows) {
+			logger.Log.Info(fmt.Sprintf("balalance for user - %s not found", login), zap.Error(err))
+			return &balance, nil
+		}
+		return &balance, err
 	}
-	balance.Login = &loginFromDB
-	balance.Current = &current
-	balance.Withdrawn = &withdrawn
-	return balance, nil
+
+	balance.Login = login
+	balance.Current = current
+
+	err = tx.QueryRowContext(ctx, "SELECT login, SUM(sum) as withdrawns FROM withdrawals WHERE login = $1 group by login", login).Scan(&withdrawn)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			logger.Log.Info(fmt.Sprintf("balalance for user - %s not found", login), zap.Error(err))
+			return &balance, nil
+		}
+		return &balance, err
+	}
+
+	balance.Withdrawn = withdrawn
+	return &balance, nil
 }

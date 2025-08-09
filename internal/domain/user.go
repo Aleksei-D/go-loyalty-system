@@ -7,5 +7,6 @@ import (
 
 type UserRepository interface {
 	Create(ctx context.Context, user *models.User) (*models.User, error)
-	GetByLogin(ctx context.Context, username string) (*models.User, bool)
+	GetByLogin(ctx context.Context, login string) (*models.User, error)
+	IsExist(ctx context.Context, login string) (bool, error)
 }

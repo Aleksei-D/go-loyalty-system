@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"encoding/json"
+	"github.com/Aleksei-D/go-loyalty-system/internal/logger"
 	"github.com/Aleksei-D/go-loyalty-system/internal/models"
 	"github.com/Aleksei-D/go-loyalty-system/internal/service"
-	crypto2 "github.com/Aleksei-D/go-loyalty-system/pkg/utils/crypto"
+	crypto "github.com/Aleksei-D/go-loyalty-system/pkg/utils/crypto"
+	"go.uber.org/zap"
 	"io"
 	"net/http"
 )
@@ -18,7 +20,7 @@ func NewUserHandlers(us *service.UserService, secretKey string) *UserHandlers {
 	return &UserHandlers{us, secretKey}
 }
 
-func (u *UserHandlers) ApiUserRegisterHandler() func(http.ResponseWriter, *http.Request) {
+func (u *UserHandlers) APIUserRegisterHandler() func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var user models.User
 		buf, err := io.ReadAll(r.Body)
@@ -32,37 +34,36 @@ func (u *UserHandlers) ApiUserRegisterHandler() func(http.ResponseWriter, *http.
 			return
 		}
 
-		hashedPassword, err := crypto2.HashPassword(*user.Password)
+		hashedPassword, err := crypto.HashPassword(user.Password)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		if _, exists := u.us.GetByLogin(r.Context(), *user.Login); exists {
+		ok, err := u.us.IsExist(r.Context(), user.Login)
+		if err != nil {
+			http.Error(w, "server error", http.StatusInternalServerError)
+			return
+		}
+
+		if !ok {
 			http.Error(w, "User already Exist", http.StatusConflict)
 			return
 		}
 
-		user.Password = &hashedPassword
-		registeredUser, err := u.us.Create(r.Context(), &user)
+		user.Password = hashedPassword
+		_, err = u.us.Create(r.Context(), &user)
 		if err != nil {
-			http.Error(w, "invalid marshaling", http.StatusInternalServerError)
+			logger.Log.Warn("User Create Error", zap.Error(err))
+			http.Error(w, "create user error", http.StatusInternalServerError)
 			return
 		}
 
-		registeredUserJson, err := json.Marshal(registeredUser)
-		if err != nil {
-			http.Error(w, "invalid marshaling", http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "service/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(registeredUserJson)
 	}
 }
 
-func (u *UserHandlers) ApiUserLoginHandler() func(http.ResponseWriter, *http.Request) {
+func (u *UserHandlers) APIUserLoginHandler() func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var loginUser models.User
 		buf, err := io.ReadAll(r.Body)
@@ -77,27 +78,22 @@ func (u *UserHandlers) ApiUserLoginHandler() func(http.ResponseWriter, *http.Req
 			return
 		}
 
-		user, exists := u.us.GetByLogin(r.Context(), *loginUser.Login)
-		if !exists || !crypto2.CheckPasswordHash(*loginUser.Password, *user.Password) {
+		existUser, err := u.us.GetByLogin(r.Context(), loginUser.Login)
+		if err != nil {
+			http.Error(w, "invalid marshaling", http.StatusInternalServerError)
+		}
+		if existUser == nil || !crypto.CheckPasswordHash(loginUser.Password, existUser.Password) {
 			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 			return
 		}
 
-		tokenString, err := crypto2.CreateToken(*user.Login, u.secretKey)
+		tokenString, err := crypto.CreateToken(existUser.Login, u.secretKey)
 		if err != nil {
 			http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 			return
 		}
 
-		userJson, err := json.Marshal(user)
-		if err != nil {
-			http.Error(w, "invalid marshaling", http.StatusInternalServerError)
-			return
-		}
-
 		json.NewEncoder(w).Encode(map[string]string{"token": tokenString})
-		w.Header().Set("Content-Type", "service/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(userJson)
 	}
 }

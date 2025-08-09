@@ -24,7 +24,7 @@ func (p *PostgresUserRepository) Create(ctx context.Context, user *models.User) 
 		return nil, err
 	}
 
-	userCreateQuery := `INSERT INTO user (login, password) VALUES ($1, $2)`
+	userCreateQuery := `INSERT INTO users (login, password) VALUES ($1, $2)`
 	stmtUser, err := tx.Prepare(userCreateQuery)
 	if err != nil {
 		return nil, err
@@ -50,7 +50,7 @@ func (p *PostgresUserRepository) Create(ctx context.Context, user *models.User) 
 		return nil, err
 	}
 
-	_, err = stmtBalance.ExecContext(ctx, user.Login, user.Password)
+	_, err = stmtBalance.ExecContext(ctx, user.Login)
 	if err != nil {
 		err = tx.Rollback()
 		if err != nil {
@@ -67,25 +67,35 @@ func (p *PostgresUserRepository) Create(ctx context.Context, user *models.User) 
 	return user, nil
 }
 
-func (p *PostgresUserRepository) GetByLogin(ctx context.Context, username string) (*models.User, bool) {
-	var user *models.User
-	var login string
+func (p *PostgresUserRepository) GetByLogin(ctx context.Context, login string) (*models.User, error) {
+	var user models.User
+	var loginFromDb string
 	var password string
-	row := p.db.QueryRowContext(ctx, "SELECT login, password FROM user WHERE login = $1", username)
-
-	if err := row.Err(); err != nil {
-		if errors.Is(sql.ErrNoRows, row.Err()) {
-			logger.Log.Info(fmt.Sprintf("user - %s not found", username), zap.Error(err))
-			return user, false
-		}
-		return user, false
-	}
-
-	err := row.Scan(&login, &password)
+	err := p.db.QueryRowContext(ctx, "SELECT login, password FROM users WHERE login = $1", login).Scan(&loginFromDb, &password)
 	if err != nil {
-		return user, false
+		if errors.Is(err, sql.ErrNoRows) {
+			logger.Log.Info(fmt.Sprintf("user - %s not found", login), zap.Error(err))
+			return &user, nil
+		}
+		return &user, err
 	}
-	user.Login = &login
-	user.Password = &password
-	return user, true
+
+	user.Login = loginFromDb
+	user.Password = password
+	return &user, err
+}
+
+func (p *PostgresUserRepository) IsExist(ctx context.Context, login string) (bool, error) {
+	var loginFromDb string
+	var password string
+	err := p.db.QueryRowContext(ctx, "SELECT login, password FROM users WHERE login = $1", login).Scan(&loginFromDb, &password)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			logger.Log.Info(fmt.Sprintf("user - %s not found", login), zap.Error(err))
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
 }

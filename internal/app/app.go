@@ -26,7 +26,7 @@ type App struct {
 }
 
 func NewApp(cfg *config.Config) (*App, error) {
-	db, err := datasource.NewDatabase(*cfg.DatabaseUri)
+	db, err := datasource.NewDatabase(*cfg.DatabaseURI)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func (app *App) Run() error {
 
 		go func() {
 			<-shutdownCtx.Done()
-			if errors.Is(context.DeadlineExceeded, shutdownCtx.Err()) {
+			if errors.Is(shutdownCtx.Err(), context.DeadlineExceeded) {
 				log.Fatal("graceful shutdown timed out.. forcing exit.")
 			}
 		}()
@@ -72,15 +72,15 @@ func (app *App) Run() error {
 		serverStopCtx()
 	}()
 
-	err := server.ListenAndServe()
-	if err != nil && !errors.Is(http.ErrServerClosed, err) {
-		logger.Log.Fatal("cannot start server", zap.Error(err))
-	}
-
 	orderAgent := orders_agent.NewOrdersAgent(service.NewOrderService(infrastructure.NewPostgresOrderRepository(app.db)), app.cfg)
 	go orderAgent.Run(serverCtx)
 
-	<-serverCtx.Done()
+	err := server.ListenAndServe()
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		logger.Log.Fatal("cannot start server", zap.Error(err))
+		return err
+	}
 
+	<-serverCtx.Done()
 	return nil
 }
