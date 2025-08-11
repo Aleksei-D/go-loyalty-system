@@ -1,9 +1,10 @@
-package orders_agent
+package agent
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/Aleksei-D/go-loyalty-system/internal/logger"
 	"github.com/Aleksei-D/go-loyalty-system/internal/models"
 	"github.com/Aleksei-D/go-loyalty-system/pkg/utils/delay"
 	"io"
@@ -43,19 +44,23 @@ func (rr retryRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	newDelay := delay.NewDelay()
 	for attempts := 0; attempts < int(rr.maxRetries); attempts++ {
 		resp, err = rr.next.RoundTrip(r)
-		switch resp.StatusCode {
-		case http.StatusTooManyRequests:
-			retryAfter := resp.Header.Get("Retry-After")
-			if retryAfter != "" {
-				retryAfterSeconds, err := strconv.Atoi(retryAfter)
-				if err != nil {
-					fmt.Println("Could not parse Retry-After header.")
-					seconds = newDelay()
+		if resp != nil {
+			switch resp.StatusCode {
+			case http.StatusTooManyRequests:
+				retryAfter := resp.Header.Get("Retry-After")
+				if retryAfter != "" {
+					retryAfterSeconds, err := strconv.Atoi(retryAfter)
+					if err != nil {
+						logger.Log.Warn("Could not parse Retry-After header.")
+						seconds = newDelay()
+					} else {
+						seconds = time.Duration(retryAfterSeconds) * time.Second
+					}
+
 				}
-				seconds = time.Duration(retryAfterSeconds) * time.Second
+			default:
+				seconds = newDelay()
 			}
-		default:
-			seconds = newDelay()
 		}
 
 		select {
@@ -71,7 +76,7 @@ func (rr retryRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 func (s *StatusUpdaterClient) getOrderStatus(orderNumber string) models.OrderResult {
 	var result models.OrderResult
 	var order *models.Order
-	url := fmt.Sprintf("%s%s%s", s.url, acceptedOrderURL, orderNumber)
+	url := fmt.Sprintf("http://%s%s%s", s.url, acceptedOrderURL, orderNumber)
 	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(nil))
 	if err != nil {
 		result.Err = err

@@ -46,11 +46,10 @@ func (wh *WithdrawHandlers) APIWithdrawHandler() func(http.ResponseWriter, *http
 		err = wh.ws.Withdraw(r.Context(), &withdrawal)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusPaymentRequired)
+			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		return
 	}
 }
 

@@ -69,9 +69,9 @@ func (p *PostgresUserRepository) Create(ctx context.Context, user *models.User) 
 
 func (p *PostgresUserRepository) GetByLogin(ctx context.Context, login string) (*models.User, error) {
 	var user models.User
-	var loginFromDb string
+	var loginFromDB string
 	var password string
-	err := p.db.QueryRowContext(ctx, "SELECT login, password FROM users WHERE login = $1", login).Scan(&loginFromDb, &password)
+	err := p.db.QueryRowContext(ctx, "SELECT login, password FROM users WHERE login = $1", login).Scan(&loginFromDB, &password)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			logger.Log.Info(fmt.Sprintf("user - %s not found", login), zap.Error(err))
@@ -80,15 +80,15 @@ func (p *PostgresUserRepository) GetByLogin(ctx context.Context, login string) (
 		return &user, err
 	}
 
-	user.Login = loginFromDb
+	user.Login = loginFromDB
 	user.Password = password
 	return &user, err
 }
 
 func (p *PostgresUserRepository) IsExist(ctx context.Context, login string) (bool, error) {
-	var loginFromDb string
+	var loginFromDB string
 	var password string
-	err := p.db.QueryRowContext(ctx, "SELECT login, password FROM users WHERE login = $1", login).Scan(&loginFromDb, &password)
+	err := p.db.QueryRowContext(ctx, "SELECT login, password FROM users WHERE login = $1", login).Scan(&loginFromDB, &password)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			logger.Log.Info(fmt.Sprintf("user - %s not found", login), zap.Error(err))

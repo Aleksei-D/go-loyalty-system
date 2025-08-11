@@ -46,7 +46,7 @@ func (u *UserHandlers) APIUserRegisterHandler() func(http.ResponseWriter, *http.
 			return
 		}
 
-		if !ok {
+		if ok {
 			http.Error(w, "User already Exist", http.StatusConflict)
 			return
 		}
@@ -59,6 +59,13 @@ func (u *UserHandlers) APIUserRegisterHandler() func(http.ResponseWriter, *http.
 			return
 		}
 
+		tokenString, err := crypto.CreateToken(user.Login, u.secretKey)
+		if err != nil {
+			http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Add("Authorization", tokenString)
 		w.WriteHeader(http.StatusOK)
 	}
 }
@@ -93,7 +100,7 @@ func (u *UserHandlers) APIUserLoginHandler() func(http.ResponseWriter, *http.Req
 			return
 		}
 
-		json.NewEncoder(w).Encode(map[string]string{"token": tokenString})
+		w.Header().Add("Authorization", tokenString)
 		w.WriteHeader(http.StatusOK)
 	}
 }

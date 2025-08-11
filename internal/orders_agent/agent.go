@@ -1,4 +1,4 @@
-package orders_agent
+package agent
 
 import (
 	"context"

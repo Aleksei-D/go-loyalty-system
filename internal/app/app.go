@@ -7,7 +7,7 @@ import (
 	"github.com/Aleksei-D/go-loyalty-system/internal/config"
 	"github.com/Aleksei-D/go-loyalty-system/internal/domain/infrastructure"
 	"github.com/Aleksei-D/go-loyalty-system/internal/logger"
-	"github.com/Aleksei-D/go-loyalty-system/internal/orders_agent"
+	agent "github.com/Aleksei-D/go-loyalty-system/internal/orders_agent"
 	"github.com/Aleksei-D/go-loyalty-system/internal/router"
 	"github.com/Aleksei-D/go-loyalty-system/internal/service"
 	"github.com/Aleksei-D/go-loyalty-system/pkg/datasource"
@@ -72,7 +72,7 @@ func (app *App) Run() error {
 		serverStopCtx()
 	}()
 
-	orderAgent := orders_agent.NewOrdersAgent(service.NewOrderService(infrastructure.NewPostgresOrderRepository(app.db)), app.cfg)
+	orderAgent := agent.NewOrdersAgent(service.NewOrderService(infrastructure.NewPostgresOrderRepository(app.db)), app.cfg)
 	go orderAgent.Run(serverCtx)
 
 	err := server.ListenAndServe()
