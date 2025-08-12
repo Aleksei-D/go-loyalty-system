@@ -14,5 +14,9 @@ func NewDatabase(databaseURI string) (*sql.DB, error) {
 	if err := db.Ping(); err != nil {
 		return nil, err
 	}
+
+	if err := upMigrations(db); err != nil {
+		return nil, err
+	}
 	return db, nil
 }

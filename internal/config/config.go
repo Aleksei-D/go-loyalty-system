@@ -10,7 +10,7 @@ import (
 const (
 	defaultServerAddr           = "localhost:8080"
 	databaseURIDefault          = "postgres://user:password@localhost:5432/loyalty-system?sslmode=disable"
-	accrualSystemAddressDefault = "localhost:22222"
+	accrualSystemAddressDefault = "http://localhost:4444"
 	secretKeyDefault            = "secretKey"
 	pollIntervalDefault         = 2
 	RateLimitDefault            = 3

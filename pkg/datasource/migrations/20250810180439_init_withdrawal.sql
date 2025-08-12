@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS withdrawals (
     login text NOT NULL,
     order_number text NOT NULL,
     sum DECIMAL(10, 2),
-    processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    processed_at timestamptz DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY(login, order_number)
 );
 -- +goose StatementBegin

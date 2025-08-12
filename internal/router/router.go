@@ -32,7 +32,7 @@ func NewRouter(service *service.Service, secretKey string) chi.Router {
 			r.Post("/withdraw", withdrawHandlers.APIWithdrawHandler())
 		})
 
-		r.Route("/withdraws", func(r chi.Router) {
+		r.Route("/withdrawals", func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(secretKey))
 			r.Get("/", withdrawHandlers.APIGetWithdrawalsHandler())
 		})

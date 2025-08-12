@@ -66,7 +66,6 @@ func (p *PostgresWithdrawalRepository) Withdraw(ctx context.Context, withdraw *m
 	}
 
 	var currentBalance float64
-
 	err = tx.QueryRowContext(ctx, "SELECT current FROM balance WHERE login = $1", withdraw.Login).Scan(&currentBalance)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -114,4 +113,18 @@ func (p *PostgresWithdrawalRepository) Withdraw(ctx context.Context, withdraw *m
 		return err
 	}
 	return nil
+}
+
+func (p *PostgresWithdrawalRepository) IsExist(ctx context.Context, withdraw *models.Withdrawal) (bool, error) {
+	var orderNumber string
+	err := p.db.QueryRowContext(ctx, "SELECT order_number FROM withdrawals WHERE order_number = $1", withdraw.OrderNumber).Scan(&orderNumber)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			logger.Log.Info(fmt.Sprintf("order - %s already used", orderNumber), zap.Error(err))
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
 }

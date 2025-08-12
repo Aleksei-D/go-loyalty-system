@@ -6,6 +6,7 @@ import (
 	"github.com/Aleksei-D/go-loyalty-system/internal/logger"
 	"github.com/Aleksei-D/go-loyalty-system/internal/models"
 	"github.com/Aleksei-D/go-loyalty-system/internal/service"
+	"go.uber.org/zap"
 	"time"
 )
 
@@ -33,20 +34,19 @@ func (o *OrdersAgent) Run(ctx context.Context) {
 	pollTicker := time.NewTicker(time.Duration(*o.config.PollInterval) * time.Second)
 	defer pollTicker.Stop()
 
-	resultCh := make(chan models.OrderResult)
-	defer close(resultCh)
+	errorCh := make(chan error)
+	defer close(errorCh)
 
-	orderNumberCh := o.orderGenerator(ctx, doneCh, pollTicker)
-	orderNewStatusCh := o.OrdersStatusGenerator(ctx, doneCh, orderNumberCh)
-	go o.updateStatusOrder(ctx, doneCh, orderNewStatusCh, resultCh)
-	for res := range resultCh {
-		if res.Err != nil {
-			logger.Log.Warn(res.Err.Error())
-		}
+	orderNumberCh := o.orderGenerator(ctx, doneCh, errorCh, pollTicker)
+	updateDataOrderCh := o.OrdersStatusGenerator(ctx, doneCh, orderNumberCh, errorCh)
+	go o.updateStatusOrder(ctx, doneCh, updateDataOrderCh, errorCh)
+
+	for err := range errorCh {
+		logger.Log.Warn(err.Error(), zap.Error(err))
 	}
 }
 
-func (o *OrdersAgent) updateStatusOrder(ctx context.Context, doneCh chan struct{}, orderNewStatusCh <-chan *models.Order, resultCh chan<- models.OrderResult) {
+func (o *OrdersAgent) updateStatusOrder(ctx context.Context, doneCh chan struct{}, updateDataOrderCh <-chan *models.Order, errorCh chan<- error) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -54,19 +54,20 @@ func (o *OrdersAgent) updateStatusOrder(ctx context.Context, doneCh chan struct{
 			return
 		case <-doneCh:
 			return
-		case order := <-orderNewStatusCh:
+		case order := <-updateDataOrderCh:
 			err := o.orderService.UpdateStatus(ctx, order)
 			if err != nil {
-				resultCh <- models.OrderResult{Err: err}
+				errorCh <- err
 			}
 		}
 	}
 }
 
-func (o *OrdersAgent) orderGenerator(ctx context.Context, doneCh chan struct{}, pollTicker *time.Ticker) <-chan models.OrderResult {
-	orderCh := make(chan models.OrderResult, o.orderChunkSize)
+func (o *OrdersAgent) orderGenerator(ctx context.Context, doneCh chan struct{}, errorCh chan<- error, pollTicker *time.Ticker) <-chan *models.Order {
+	orderCh := make(chan *models.Order, o.orderChunkSize)
 	go func() {
 		defer close(orderCh)
+	newOrderLoop:
 		for {
 			select {
 			case <-ctx.Done():
@@ -76,8 +77,13 @@ func (o *OrdersAgent) orderGenerator(ctx context.Context, doneCh chan struct{}, 
 				return
 			case <-pollTicker.C:
 				orders, err := o.orderService.GetNotAcceptedOrderNumbers(ctx, o.orderChunkSize)
+				if err != nil {
+					errorCh <- err
+					continue newOrderLoop
+				}
+
 				for _, order := range orders {
-					orderCh <- models.OrderResult{Order: order, Err: err}
+					orderCh <- order
 				}
 			}
 		}
@@ -85,7 +91,7 @@ func (o *OrdersAgent) orderGenerator(ctx context.Context, doneCh chan struct{}, 
 	return orderCh
 }
 
-func (o *OrdersAgent) OrdersStatusGenerator(ctx context.Context, doneCh chan struct{}, orderCh <-chan models.OrderResult) <-chan *models.Order {
+func (o *OrdersAgent) OrdersStatusGenerator(ctx context.Context, doneCh chan struct{}, orderCh <-chan *models.Order, errorCh chan<- error) <-chan *models.Order {
 	orderNewStatusCh := make(chan *models.Order, o.orderChunkSize)
 	go func() {
 		defer close(orderNewStatusCh)
@@ -98,7 +104,7 @@ func (o *OrdersAgent) OrdersStatusGenerator(ctx context.Context, doneCh chan str
 				return
 			default:
 				for w := 1; w <= int(*o.config.RateLimit); w++ {
-					go o.getOrdersStatus(ctx, doneCh, orderCh, orderNewStatusCh)
+					go o.getOrdersStatus(ctx, doneCh, orderCh, orderNewStatusCh, errorCh)
 				}
 			}
 		}
@@ -106,18 +112,19 @@ func (o *OrdersAgent) OrdersStatusGenerator(ctx context.Context, doneCh chan str
 	return orderNewStatusCh
 }
 
-func (o *OrdersAgent) getOrdersStatus(ctx context.Context, doneCh chan struct{}, orderCh <-chan models.OrderResult, orderNewStatusCh chan<- *models.Order) {
+func (o *OrdersAgent) getOrdersStatus(ctx context.Context, doneCh chan struct{}, orderCh <-chan *models.Order, orderNewStatusCh chan<- *models.Order, errorCh chan<- error) {
 	select {
 	case <-ctx.Done():
 		logger.Log.Info("Worker: Context done, exiting.")
 		return
 	case <-doneCh:
 		return
-	case orderRes := <-orderCh:
-		res := o.httpClient.getOrderStatus(orderRes.Order.Number)
-		if res.Err != nil {
-			logger.Log.Warn(res.Err.Error())
+	case newOrder := <-orderCh:
+		order, err := o.httpClient.getOrderStatus(newOrder.Number)
+		if err != nil {
+			errorCh <- err
+			return
 		}
-		orderNewStatusCh <- res.Order
+		orderNewStatusCh <- order.ToOrder()
 	}
 }

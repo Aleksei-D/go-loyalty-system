@@ -73,33 +73,27 @@ func (rr retryRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	return resp, err
 }
 
-func (s *StatusUpdaterClient) getOrderStatus(orderNumber string) models.OrderResult {
-	var result models.OrderResult
-	var order *models.Order
-	url := fmt.Sprintf("http://%s%s%s", s.url, acceptedOrderURL, orderNumber)
+func (s *StatusUpdaterClient) getOrderStatus(orderNumber string) (*models.OrderStatusResponse, error) {
+	var order models.OrderStatusResponse
+	url := fmt.Sprintf("%s%s%s", s.url, acceptedOrderURL, orderNumber)
 	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(nil))
 	if err != nil {
-		result.Err = err
-		return result
+		return &order, err
 	}
 
 	response, err := s.Do(req)
 	if err != nil {
-		result.Err = err
-		return result
+		return &order, err
 	}
 
 	buf, err := io.ReadAll(response.Body)
 	defer response.Body.Close()
 	if err != nil {
-		result.Err = err
-		return result
+		return &order, err
 	}
 
 	if err = json.Unmarshal(buf, &order); err != nil {
-		result.Err = err
-		return result
+		return &order, err
 	}
-	result.Order = order
-	return result
+	return &order, nil
 }

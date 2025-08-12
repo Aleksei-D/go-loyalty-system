@@ -6,7 +6,6 @@ import (
 	"github.com/Aleksei-D/go-loyalty-system/pkg/utils/common"
 	"github.com/golang-jwt/jwt/v5"
 	"net/http"
-	"strings"
 )
 
 func AuthMiddleware(secretKey string) func(http.Handler) http.Handler {
@@ -18,15 +17,7 @@ func AuthMiddleware(secretKey string) func(http.Handler) http.Handler {
 				return
 			}
 
-			parts := strings.Split(authHeader, " ")
-			if len(parts) != 2 || parts[0] != "Bearer" {
-				http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
-				return
-			}
-
-			tokenString := parts[1]
-
-			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			token, err := jwt.Parse(authHeader, func(token *jwt.Token) (interface{}, error) {
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 				}

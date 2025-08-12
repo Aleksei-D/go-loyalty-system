@@ -11,14 +11,14 @@ type CustomTime struct {
 }
 
 func (t *CustomTime) MarshalJSON() ([]byte, error) {
-	date := t.Time.Format(time.RFC3339)
+	date := t.Time.Format("2006-01-02T15:04:05-07:00")
 	date = fmt.Sprintf(`"%s"`, date)
 	return []byte(date), nil
 }
 
 func (t *CustomTime) UnmarshalJSON(b []byte) (err error) {
 	s := strings.Trim(string(b), "\"")
-	date, err := time.Parse(time.RFC3339, s)
+	date, err := time.Parse("2006-01-02T15:04:05-07:00", s)
 	if err != nil {
 		return err
 	}

@@ -21,3 +21,7 @@ func (w *WithdrawalService) GetAllByLogin(ctx context.Context, login string) ([]
 func (w *WithdrawalService) Withdraw(ctx context.Context, withdraw *models.Withdrawal) error {
 	return w.withdrawalRepo.Withdraw(ctx, withdraw)
 }
+
+func (w *WithdrawalService) IsExist(ctx context.Context, withdraw *models.Withdrawal) (bool, error) {
+	return w.withdrawalRepo.IsExist(ctx, withdraw)
+}

@@ -85,7 +85,7 @@ func (u *UserHandlers) APIUserLoginHandler() func(http.ResponseWriter, *http.Req
 			logger.Log.Warn(err.Error(), zap.Error(err))
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
-		if existUser == nil || loginUser.Password == existUser.Password {
+		if existUser == nil || loginUser.Password != existUser.Password {
 			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 			return
 		}

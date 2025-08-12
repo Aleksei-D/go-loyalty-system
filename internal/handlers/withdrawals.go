@@ -19,30 +19,38 @@ func NewWithdrawHandler(s *service.WithdrawalService) *WithdrawHandlers {
 
 func (wh *WithdrawHandlers) APIWithdrawHandler() func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var withdrawal models.Withdrawal
-		buf, err := io.ReadAll(r.Body)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		if err = json.Unmarshal(buf, &withdrawal); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		if ok := common.CheckLuhnAlgorithm(withdrawal.OrderNumber); !ok {
-			http.Error(w, "Invalid order number", http.StatusUnprocessableEntity)
-			return
-		}
-
 		login, ok := r.Context().Value(common.LoginKey("login")).(string)
 		if !ok {
 			http.Error(w, "Not authorized", http.StatusUnauthorized)
 			return
 		}
 
+		var withdrawal models.Withdrawal
+		buf, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err = json.Unmarshal(buf, &withdrawal); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if ok := common.CheckLuhnAlgorithm(withdrawal.OrderNumber); !ok {
+			http.Error(w, "Invalid order number", http.StatusUnprocessableEntity)
+			return
+		}
+
 		withdrawal.Login = login
+		ok, err = wh.ws.IsExist(r.Context(), &withdrawal)
+		if ok {
+			http.Error(w, "order already used", http.StatusUnprocessableEntity)
+			return
+		}
+		if err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
 		err = wh.ws.Withdraw(r.Context(), &withdrawal)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusPaymentRequired)

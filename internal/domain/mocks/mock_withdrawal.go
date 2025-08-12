@@ -50,6 +50,21 @@ func (mr *MockWithdrawalRepositoryMockRecorder) GetAllByLogin(ctx, login interfa
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllByLogin", reflect.TypeOf((*MockWithdrawalRepository)(nil).GetAllByLogin), ctx, login)
 }
 
+// IsExist mocks base method.
+func (m *MockWithdrawalRepository) IsExist(ctx context.Context, withdraw *models.Withdrawal) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsExist", ctx, withdraw)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IsExist indicates an expected call of IsExist.
+func (mr *MockWithdrawalRepositoryMockRecorder) IsExist(ctx, withdraw interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsExist", reflect.TypeOf((*MockWithdrawalRepository)(nil).IsExist), ctx, withdraw)
+}
+
 // Withdraw mocks base method.
 func (m *MockWithdrawalRepository) Withdraw(ctx context.Context, withdraw *models.Withdrawal) error {
 	m.ctrl.T.Helper()
