@@ -4,6 +4,7 @@ import (
 	"flag"
 	"github.com/caarlos0/env/v6"
 	"os"
+	"strconv"
 )
 
 const (
@@ -16,9 +17,17 @@ const (
 	waitDefault                 = 15
 )
 
+func InitConfig() (*Config, error) {
+	var newConfig Config
+	err := env.Parse(&newConfig)
+	if err != nil {
+		return nil, err
+	}
+	return &newConfig, err
+}
+
 func NewServerConfig() (*Config, error) {
-	var config Config
-	err := env.Parse(&config)
+	newConfig, err := InitConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -35,28 +44,28 @@ func NewServerConfig() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	if config.ServerAddr == nil {
-		config.ServerAddr = serverAddr
+	if newConfig.ServerAddr == nil {
+		newConfig.ServerAddr = serverAddr
 	}
-	if config.DatabaseURI == nil {
-		config.DatabaseURI = DatabaseURI
+	if newConfig.DatabaseURI == nil {
+		newConfig.DatabaseURI = DatabaseURI
 	}
-	if config.AccrualSystemAddress == nil {
-		config.AccrualSystemAddress = accrualSystemAddress
+	if newConfig.AccrualSystemAddress == nil {
+		newConfig.AccrualSystemAddress = accrualSystemAddress
 	}
-	if config.SecretKey == nil {
-		config.SecretKey = secretKey
+	if newConfig.SecretKey == nil {
+		newConfig.SecretKey = secretKey
 	}
-	if config.PollInterval == nil {
-		config.PollInterval = pollInterval
+	if newConfig.PollInterval == nil {
+		newConfig.PollInterval = pollInterval
 	}
-	if config.RateLimit == nil {
-		config.RateLimit = rateLimit
+	if newConfig.RateLimit == nil {
+		newConfig.RateLimit = rateLimit
 	}
-	if config.Wait == nil {
-		config.Wait = wait
+	if newConfig.Wait == nil {
+		newConfig.Wait = wait
 	}
-	return &config, nil
+	return newConfig, nil
 }
 
 type Config struct {
@@ -67,4 +76,23 @@ type Config struct {
 	PollInterval         *uint   `env:"POLL_INTERVAL"`
 	RateLimit            *uint   `env:"RATE_LIMIT"`
 	Wait                 *uint   `env:"WAIT"`
+}
+
+func InitDefaultEnv() error {
+	envDefaults := map[string]string{
+		"RUN_ADDRESS":            defaultServerAddr,
+		"DATABASE_URI":           databaseURIDefault,
+		"ACCRUAL_SYSTEM_ADDRESS": accrualSystemAddressDefault,
+		"SECRET_KEY":             secretKeyDefault,
+		"POLL_INTERVAL":          strconv.Itoa(pollIntervalDefault),
+		"RATE_LIMIT":             strconv.Itoa(RateLimitDefault),
+		"WAIT":                   strconv.Itoa(waitDefault),
+	}
+	for k, v := range envDefaults {
+		err := os.Setenv(k, v)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
