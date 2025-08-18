@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Aleksei-D/go-loyalty-system/internal/service"
-	"github.com/Aleksei-D/go-loyalty-system/pkg/utils/common"
+	"github.com/Aleksei-D/go-loyalty-system/internal/utils/common"
 	"io"
 	"net/http"
 )

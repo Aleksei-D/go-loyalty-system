@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS orders (
     status status_type DEFAULT 'NEW',
     accrual DECIMAL(10, 2),
     uploaded_at timestamptz DEFAULT CURRENT_TIMESTAMP,
-    is_update_status bool DEFAULT false
+    update_at timestamptz
 );
 -- +goose StatementBegin
 

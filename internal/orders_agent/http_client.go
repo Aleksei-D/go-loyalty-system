@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/Aleksei-D/go-loyalty-system/internal/logger"
 	"github.com/Aleksei-D/go-loyalty-system/internal/models"
-	"github.com/Aleksei-D/go-loyalty-system/pkg/utils/delay"
+	"github.com/Aleksei-D/go-loyalty-system/internal/utils/delay"
 	"io"
 	"net/http"
 	"strconv"

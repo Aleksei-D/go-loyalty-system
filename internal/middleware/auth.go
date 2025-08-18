@@ -3,7 +3,7 @@ package middleware
 import (
 	"context"
 	"fmt"
-	"github.com/Aleksei-D/go-loyalty-system/pkg/utils/common"
+	"github.com/Aleksei-D/go-loyalty-system/internal/utils/common"
 	"github.com/golang-jwt/jwt/v5"
 	"net/http"
 )

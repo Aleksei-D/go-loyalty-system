@@ -127,7 +127,7 @@ func (p *PostgresOrderRepository) GetOrderByNumber(ctx context.Context, orderNum
 	return &order, nil
 }
 
-func (p *PostgresOrderRepository) GetNotAcceptedOrderNumbers(ctx context.Context, limit uint) ([]*models.Order, error) {
+func (p *PostgresOrderRepository) GetNotAcceptedOrderNumbers(ctx context.Context, limit, updateTimeout uint) ([]*models.Order, error) {
 	orders := make([]*models.Order, 0)
 	tx, err := p.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -135,8 +135,9 @@ func (p *PostgresOrderRepository) GetNotAcceptedOrderNumbers(ctx context.Context
 	}
 	rows, err := tx.QueryContext(
 		ctx,
-		"SELECT number FROM orders WHERE status = ANY($1) and is_update_status = false limit $2",
+		"SELECT number FROM orders WHERE status = ANY($1) and (update_at + $2::interval < CURRENT_TIMESTAMP or update_at is null ) limit $3",
 		pq.Array([]string{models.OrderStatusNew, models.OrderStatusProcessing}),
+		fmt.Sprintf("%d second", updateTimeout),
 		limit,
 	)
 	if rows.Err() != nil {
@@ -165,7 +166,7 @@ func (p *PostgresOrderRepository) GetNotAcceptedOrderNumbers(ctx context.Context
 
 	_, err = tx.ExecContext(
 		ctx,
-		"UPDATE orders SET is_update_status = true WHERE number = ANY($1)",
+		"UPDATE orders SET update_at = CURRENT_TIMESTAMP WHERE number = ANY($1)",
 		pq.Array(orderNumbers),
 	)
 	if err != nil {
@@ -186,21 +187,12 @@ func (p *PostgresOrderRepository) UpdateStatus(ctx context.Context, order *model
 	if err != nil {
 		return err
 	}
-	var isUpdateStatus bool
-	switch order.Status {
-	case models.OrderStatusProcessed, models.OrderStatusInvalid:
-		isUpdateStatus = true
-	default:
-		isUpdateStatus = false
-
-	}
 
 	err = tx.QueryRowContext(
 		ctx,
-		"UPDATE orders SET status = $1, accrual = $2, is_update_status = $3 WHERE number = $4 RETURNING login",
+		"UPDATE orders SET status = $1, accrual = $2 WHERE number = $3 RETURNING login",
 		order.Status,
 		order.Accrual,
-		isUpdateStatus,
 		order.Number,
 	).Scan(&loginFromDB)
 

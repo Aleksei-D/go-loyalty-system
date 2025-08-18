@@ -9,7 +9,7 @@ import (
 	"github.com/Aleksei-D/go-loyalty-system/internal/models"
 	"github.com/Aleksei-D/go-loyalty-system/internal/router"
 	"github.com/Aleksei-D/go-loyalty-system/internal/service"
-	crypto2 "github.com/Aleksei-D/go-loyalty-system/pkg/utils/crypto"
+	crypto2 "github.com/Aleksei-D/go-loyalty-system/internal/utils/crypto"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

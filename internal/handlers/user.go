@@ -5,7 +5,7 @@ import (
 	"github.com/Aleksei-D/go-loyalty-system/internal/logger"
 	"github.com/Aleksei-D/go-loyalty-system/internal/models"
 	"github.com/Aleksei-D/go-loyalty-system/internal/service"
-	crypto2 "github.com/Aleksei-D/go-loyalty-system/pkg/utils/crypto"
+	crypto2 "github.com/Aleksei-D/go-loyalty-system/internal/utils/crypto"
 	"go.uber.org/zap"
 	"io"
 	"net/http"

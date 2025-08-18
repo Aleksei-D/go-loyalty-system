@@ -15,6 +15,7 @@ const (
 	pollIntervalDefault         = 2
 	RateLimitDefault            = 3
 	waitDefault                 = 15
+	updateTimeoutDefault        = 10
 )
 
 func InitConfig() (*Config, error) {
@@ -40,6 +41,7 @@ func NewServerConfig() (*Config, error) {
 	pollInterval := serverFlagSet.Uint("p", pollIntervalDefault, "poll interval")
 	rateLimit := serverFlagSet.Uint("l", RateLimitDefault, "accrual system address")
 	wait := serverFlagSet.Uint("w", waitDefault, "secret key")
+	updateTimeout := serverFlagSet.Uint("u", updateTimeoutDefault, "secret key")
 	err = serverFlagSet.Parse(os.Args[1:])
 	if err != nil {
 		return nil, err
@@ -65,6 +67,9 @@ func NewServerConfig() (*Config, error) {
 	if newConfig.Wait == nil {
 		newConfig.Wait = wait
 	}
+	if newConfig.UpdateTimeout == nil {
+		newConfig.UpdateTimeout = updateTimeout
+	}
 	return newConfig, nil
 }
 
@@ -76,6 +81,7 @@ type Config struct {
 	PollInterval         *uint   `env:"POLL_INTERVAL"`
 	RateLimit            *uint   `env:"RATE_LIMIT"`
 	Wait                 *uint   `env:"WAIT"`
+	UpdateTimeout        *uint   `env:"UPDATE_TIMEOUT"`
 }
 
 func InitDefaultEnv() error {
@@ -87,6 +93,7 @@ func InitDefaultEnv() error {
 		"POLL_INTERVAL":          strconv.Itoa(pollIntervalDefault),
 		"RATE_LIMIT":             strconv.Itoa(RateLimitDefault),
 		"WAIT":                   strconv.Itoa(waitDefault),
+		"UPDATE_TIMEOUT":         strconv.Itoa(updateTimeoutDefault),
 	}
 	for k, v := range envDefaults {
 		err := os.Setenv(k, v)

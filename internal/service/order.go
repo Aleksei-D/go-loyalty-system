@@ -26,8 +26,8 @@ func (o *OrderService) GetOrderByNumber(ctx context.Context, orderNumber string)
 	return o.orderRepo.GetOrderByNumber(ctx, orderNumber)
 }
 
-func (o *OrderService) GetNotAcceptedOrderNumbers(ctx context.Context, limit uint) ([]*models.Order, error) {
-	return o.orderRepo.GetNotAcceptedOrderNumbers(ctx, limit)
+func (o *OrderService) GetNotAcceptedOrderNumbers(ctx context.Context, limit, updateTimeout uint) ([]*models.Order, error) {
+	return o.orderRepo.GetNotAcceptedOrderNumbers(ctx, limit, updateTimeout)
 }
 
 func (o *OrderService) UpdateStatus(ctx context.Context, order *models.Order) error {

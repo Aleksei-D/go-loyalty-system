@@ -66,18 +66,18 @@ func (mr *MockOrderRepositoryMockRecorder) GetAllByLogin(ctx, login interface{})
 }
 
 // GetNotAcceptedOrderNumbers mocks base method.
-func (m *MockOrderRepository) GetNotAcceptedOrderNumbers(ctx context.Context, limit uint) ([]*models.Order, error) {
+func (m *MockOrderRepository) GetNotAcceptedOrderNumbers(ctx context.Context, limit, updateTimeout uint) ([]*models.Order, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetNotAcceptedOrderNumbers", ctx, limit)
+	ret := m.ctrl.Call(m, "GetNotAcceptedOrderNumbers", ctx, limit, updateTimeout)
 	ret0, _ := ret[0].([]*models.Order)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetNotAcceptedOrderNumbers indicates an expected call of GetNotAcceptedOrderNumbers.
-func (mr *MockOrderRepositoryMockRecorder) GetNotAcceptedOrderNumbers(ctx, limit interface{}) *gomock.Call {
+func (mr *MockOrderRepositoryMockRecorder) GetNotAcceptedOrderNumbers(ctx, limit, updateTimeout interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNotAcceptedOrderNumbers", reflect.TypeOf((*MockOrderRepository)(nil).GetNotAcceptedOrderNumbers), ctx, limit)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNotAcceptedOrderNumbers", reflect.TypeOf((*MockOrderRepository)(nil).GetNotAcceptedOrderNumbers), ctx, limit, updateTimeout)
 }
 
 // GetOrderByNumber mocks base method.

@@ -76,7 +76,7 @@ func (o *OrdersAgent) orderGenerator(ctx context.Context, doneCh chan struct{}, 
 			case <-doneCh:
 				return
 			case <-pollTicker.C:
-				orders, err := o.orderService.GetNotAcceptedOrderNumbers(ctx, o.orderChunkSize)
+				orders, err := o.orderService.GetNotAcceptedOrderNumbers(ctx, o.orderChunkSize, *o.config.UpdateTimeout)
 				if err != nil {
 					errorCh <- err
 					continue newOrderLoop
