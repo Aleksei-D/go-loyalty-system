@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"github.com/Aleksei-D/go-loyalty-system/internal/service"
 	"github.com/Aleksei-D/go-loyalty-system/internal/utils/common"
 	"io"
@@ -33,39 +33,20 @@ func (o *OrderHandlers) APIAddOrdersHandler() func(http.ResponseWriter, *http.Re
 			return
 		}
 
-		if ok := common.CheckLuhnAlgorithm(orderNumber); !ok {
-			http.Error(w, "Invalid order number", http.StatusUnprocessableEntity)
-			return
-		}
-
-		ok, err = o.orderService.IsExist(r.Context(), orderNumber)
+		_, err = o.orderService.AddOrder(r.Context(), orderNumber, login)
 		if err != nil {
-			http.Error(w, "adding order error", http.StatusInternalServerError)
-			return
-		}
-		if ok {
-			existOrder, err := o.orderService.GetOrderByNumber(r.Context(), orderNumber)
-			if err != nil {
-				http.Error(w, "adding order error", http.StatusInternalServerError)
-				return
-			}
-			if existOrder.Login == login {
+			switch {
+			case errors.Is(err, common.ErrInvalidOrderNumber):
+				http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			case errors.Is(err, common.ErrOrderBelongAnotherUser):
+				http.Error(w, err.Error(), http.StatusConflict)
+			case errors.Is(err, common.ErrOrderAlreadyAdded):
 				w.WriteHeader(http.StatusOK)
-				return
+			default:
+				http.Error(w, "adding order error", http.StatusInternalServerError)
 			}
-
-			if existOrder.Login != login {
-				http.Error(w, fmt.Sprintf("Wrong OrderNumber %s", orderNumber), http.StatusConflict)
-				return
-			}
-		}
-
-		_, err = o.orderService.Add(r.Context(), login, orderNumber)
-		if err != nil {
-			http.Error(w, "adding order error", http.StatusInternalServerError)
 			return
 		}
-
 		w.WriteHeader(http.StatusAccepted)
 	}
 }

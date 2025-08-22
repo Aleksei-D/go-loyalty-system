@@ -130,12 +130,16 @@ func (p *PostgresOrderRepository) GetOrderByNumber(ctx context.Context, orderNum
 func (p *PostgresOrderRepository) GetNotAcceptedOrderNumbers(ctx context.Context, limit, updateTimeout uint) ([]*models.Order, error) {
 	orders := make([]*models.Order, 0)
 	tx, err := p.db.BeginTx(ctx, nil)
+	defer tx.Rollback()
 	if err != nil {
 		return orders, err
 	}
+	query := `SELECT number FROM orders 
+              WHERE status = ANY($1) and (update_at + $2::interval < CURRENT_TIMESTAMP or update_at is null ) and in_update is false 
+              limit $3`
 	rows, err := tx.QueryContext(
 		ctx,
-		"SELECT number FROM orders WHERE status = ANY($1) and (update_at + $2::interval < CURRENT_TIMESTAMP or update_at is null ) limit $3",
+		query,
 		pq.Array([]string{models.OrderStatusNew, models.OrderStatusProcessing}),
 		fmt.Sprintf("%d second", updateTimeout),
 		limit,
@@ -166,11 +170,10 @@ func (p *PostgresOrderRepository) GetNotAcceptedOrderNumbers(ctx context.Context
 
 	_, err = tx.ExecContext(
 		ctx,
-		"UPDATE orders SET update_at = CURRENT_TIMESTAMP WHERE number = ANY($1)",
+		"UPDATE orders SET update_at = CURRENT_TIMESTAMP, in_update = true WHERE number = ANY($1)",
 		pq.Array(orderNumbers),
 	)
 	if err != nil {
-		err := tx.Rollback()
 		return orders, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -182,22 +185,30 @@ func (p *PostgresOrderRepository) GetNotAcceptedOrderNumbers(ctx context.Context
 
 func (p *PostgresOrderRepository) UpdateStatus(ctx context.Context, order *models.Order) error {
 	var loginFromDB string
+	var inUpdateStatus bool
+	switch order.Status {
+	case models.OrderStatusInvalid, models.OrderStatusProcessed:
+		inUpdateStatus = true
+	default:
+		inUpdateStatus = false
+	}
 
 	tx, err := p.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
+	defer tx.Rollback()
 
 	err = tx.QueryRowContext(
 		ctx,
-		"UPDATE orders SET status = $1, accrual = $2 WHERE number = $3 RETURNING login",
+		"UPDATE orders SET status = $1, accrual = $2, in_update = $3 WHERE number = $4 RETURNING login",
 		order.Status,
 		order.Accrual,
+		inUpdateStatus,
 		order.Number,
 	).Scan(&loginFromDB)
 
 	if err != nil {
-		err = tx.Rollback()
 		return err
 	}
 
@@ -210,7 +221,6 @@ func (p *PostgresOrderRepository) UpdateStatus(ctx context.Context, order *model
 		)
 
 		if err != nil {
-			err = tx.Rollback()
 			return err
 		}
 	}

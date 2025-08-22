@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/Aleksei-D/go-loyalty-system/internal/logger"
 	"github.com/Aleksei-D/go-loyalty-system/internal/models"
+	"github.com/Aleksei-D/go-loyalty-system/internal/utils/common"
 	"go.uber.org/zap"
 	"time"
 )
@@ -64,6 +65,7 @@ func (p *PostgresWithdrawalRepository) Withdraw(ctx context.Context, withdraw *m
 	if err != nil {
 		return err
 	}
+	defer tx.Rollback()
 
 	var currentBalance float64
 	err = tx.QueryRowContext(ctx, "SELECT current FROM balance WHERE login = $1", withdraw.Login).Scan(&currentBalance)
@@ -76,7 +78,7 @@ func (p *PostgresWithdrawalRepository) Withdraw(ctx context.Context, withdraw *m
 	}
 
 	if currentBalance < withdraw.Sum {
-		return fmt.Errorf("insufficient balance")
+		return common.ErrPaymentInsufficient
 	}
 
 	_, err = tx.ExecContext(
@@ -87,10 +89,6 @@ func (p *PostgresWithdrawalRepository) Withdraw(ctx context.Context, withdraw *m
 		withdraw.Sum,
 	)
 	if err != nil {
-		err := tx.Rollback()
-		if err != nil {
-			return err
-		}
 		return err
 	}
 
@@ -101,10 +99,6 @@ func (p *PostgresWithdrawalRepository) Withdraw(ctx context.Context, withdraw *m
 		withdraw.Login,
 	)
 	if err != nil {
-		err := tx.Rollback()
-		if err != nil {
-			return err
-		}
 		return err
 	}
 

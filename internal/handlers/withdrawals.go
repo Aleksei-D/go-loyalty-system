@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/Aleksei-D/go-loyalty-system/internal/models"
 	"github.com/Aleksei-D/go-loyalty-system/internal/service"
 	"github.com/Aleksei-D/go-loyalty-system/internal/utils/common"
@@ -35,25 +36,20 @@ func (wh *WithdrawHandlers) APIWithdrawHandler() func(http.ResponseWriter, *http
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if ok := common.CheckLuhnAlgorithm(withdrawal.OrderNumber); !ok {
-			http.Error(w, "Invalid order number", http.StatusUnprocessableEntity)
-			return
-		}
 
 		withdrawal.Login = login
-		ok, err = wh.ws.IsExist(r.Context(), &withdrawal)
-		if ok {
-			http.Error(w, "order already used", http.StatusUnprocessableEntity)
-			return
-		}
-		if err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-
 		err = wh.ws.Withdraw(r.Context(), &withdrawal)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusPaymentRequired)
+			switch {
+			case errors.Is(err, common.ErrInvalidOrderNumber):
+				http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			case errors.Is(err, common.ErrOrderAlreadyAdded):
+				http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			case errors.Is(err, common.ErrPaymentInsufficient):
+				http.Error(w, err.Error(), http.StatusPaymentRequired)
+			default:
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			}
 			return
 		}
 
@@ -70,12 +66,12 @@ func (wh *WithdrawHandlers) APIGetWithdrawalsHandler() func(http.ResponseWriter,
 		}
 
 		withdrawals, err := wh.ws.GetAllByLogin(r.Context(), login)
-		if len(withdrawals) == 0 {
-			http.Error(w, "withdrawals not found", http.StatusNoContent)
-			return
-		}
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			if errors.Is(err, common.ErrNoContent) {
+				http.Error(w, "withdrawals not found", http.StatusNoContent)
+			} else {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
 			return
 		}
 

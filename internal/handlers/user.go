@@ -2,11 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
-	"github.com/Aleksei-D/go-loyalty-system/internal/logger"
+	"errors"
 	"github.com/Aleksei-D/go-loyalty-system/internal/models"
 	"github.com/Aleksei-D/go-loyalty-system/internal/service"
-	crypto2 "github.com/Aleksei-D/go-loyalty-system/internal/utils/crypto"
-	"go.uber.org/zap"
+	"github.com/Aleksei-D/go-loyalty-system/internal/utils/common"
 	"io"
 	"net/http"
 )
@@ -34,28 +33,19 @@ func (u *UserHandlers) APIUserRegisterHandler() func(http.ResponseWriter, *http.
 			return
 		}
 
-		ok, err := u.us.IsExist(r.Context(), user.Login)
+		_, err = u.us.CreateUser(r.Context(), &user)
 		if err != nil {
-			logger.Log.Warn(err.Error(), zap.Error(err))
-			http.Error(w, "server error", http.StatusInternalServerError)
+			switch {
+			case errors.Is(err, common.ErrUserAlreadyExists):
+				http.Error(w, err.Error(), http.StatusConflict)
+			default:
+				http.Error(w, "server error", http.StatusInternalServerError)
+			}
 			return
 		}
 
-		if ok {
-			http.Error(w, "User already Exist", http.StatusConflict)
-			return
-		}
-
-		_, err = u.us.Create(r.Context(), &user)
+		tokenString, err := u.us.GetToken(user.Login, u.secretKey)
 		if err != nil {
-			logger.Log.Warn("User Create Error", zap.Error(err))
-			http.Error(w, "create user error", http.StatusInternalServerError)
-			return
-		}
-
-		tokenString, err := crypto2.CreateToken(user.Login, u.secretKey)
-		if err != nil {
-			logger.Log.Warn(err.Error(), zap.Error(err))
 			http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 			return
 		}
@@ -80,19 +70,19 @@ func (u *UserHandlers) APIUserLoginHandler() func(http.ResponseWriter, *http.Req
 			return
 		}
 
-		existUser, err := u.us.GetByLogin(r.Context(), loginUser.Login)
+		err = u.us.Login(r.Context(), &loginUser)
 		if err != nil {
-			logger.Log.Warn(err.Error(), zap.Error(err))
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		}
-		if existUser == nil || loginUser.Password != existUser.Password {
-			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+			switch {
+			case errors.Is(err, common.ErrInvalidCredentials):
+				http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+			default:
+				http.Error(w, "server error", http.StatusInternalServerError)
+			}
 			return
 		}
 
-		tokenString, err := crypto2.CreateToken(existUser.Login, u.secretKey)
+		tokenString, err := u.us.GetToken(loginUser.Login, u.secretKey)
 		if err != nil {
-			logger.Log.Warn(err.Error(), zap.Error(err))
 			http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 			return
 		}

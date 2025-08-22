@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/Aleksei-D/go-loyalty-system/internal/domain"
 	"github.com/Aleksei-D/go-loyalty-system/internal/models"
+	"github.com/Aleksei-D/go-loyalty-system/internal/utils/common"
 )
 
 type OrderService struct {
@@ -18,14 +19,6 @@ func (o *OrderService) GetAllByLogin(ctx context.Context, login string) ([]*mode
 	return o.orderRepo.GetAllByLogin(ctx, login)
 }
 
-func (o *OrderService) Add(ctx context.Context, login, orderNumber string) (*models.Order, error) {
-	return o.orderRepo.Add(ctx, login, orderNumber)
-}
-
-func (o *OrderService) GetOrderByNumber(ctx context.Context, orderNumber string) (*models.Order, error) {
-	return o.orderRepo.GetOrderByNumber(ctx, orderNumber)
-}
-
 func (o *OrderService) GetNotAcceptedOrderNumbers(ctx context.Context, limit, updateTimeout uint) ([]*models.Order, error) {
 	return o.orderRepo.GetNotAcceptedOrderNumbers(ctx, limit, updateTimeout)
 }
@@ -34,6 +27,31 @@ func (o *OrderService) UpdateStatus(ctx context.Context, order *models.Order) er
 	return o.orderRepo.UpdateStatus(ctx, order)
 }
 
-func (o *OrderService) IsExist(ctx context.Context, orderNumber string) (bool, error) {
-	return o.orderRepo.IsExist(ctx, orderNumber)
+func (o *OrderService) AddOrder(ctx context.Context, orderNumber, login string) (*models.Order, error) {
+	if ok := common.CheckLuhnAlgorithm(orderNumber); !ok {
+		return nil, common.ErrInvalidOrderNumber
+	}
+
+	ok, err := o.orderRepo.IsExist(ctx, orderNumber)
+	if err != nil {
+		return nil, err
+	}
+
+	if ok {
+		existOrder, err := o.orderRepo.GetOrderByNumber(ctx, orderNumber)
+		if err != nil {
+			return nil, err
+		}
+
+		if existOrder.Login == login {
+			return nil, common.ErrOrderAlreadyAdded
+		}
+		return nil, common.ErrOrderBelongAnotherUser
+	}
+
+	addedOrder, err := o.orderRepo.Add(ctx, login, orderNumber)
+	if err != nil {
+		return nil, err
+	}
+	return addedOrder, err
 }

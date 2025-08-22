@@ -23,6 +23,7 @@ func (p *PostgresUserRepository) Create(ctx context.Context, user *models.User) 
 	if err != nil {
 		return nil, err
 	}
+	defer tx.Rollback()
 
 	userCreateQuery := `INSERT INTO users (login, password) VALUES ($1, $2)`
 	stmtUser, err := tx.Prepare(userCreateQuery)
@@ -33,29 +34,17 @@ func (p *PostgresUserRepository) Create(ctx context.Context, user *models.User) 
 
 	_, err = stmtUser.ExecContext(ctx, user.Login, user.Password)
 	if err != nil {
-		err = tx.Rollback()
-		if err != nil {
-			return nil, err
-		}
 		return nil, err
 	}
 
 	balanceCreateQuery := `INSERT INTO balance (login) VALUES ($1)`
 	stmtBalance, err := tx.Prepare(balanceCreateQuery)
 	if err != nil {
-		err = tx.Rollback()
-		if err != nil {
-			return nil, err
-		}
 		return nil, err
 	}
 
 	_, err = stmtBalance.ExecContext(ctx, user.Login)
 	if err != nil {
-		err = tx.Rollback()
-		if err != nil {
-			return nil, err
-		}
 		return nil, err
 	}
 
