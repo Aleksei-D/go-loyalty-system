@@ -1,0 +1,82 @@
+package handlers
+
+import (
+	"encoding/json"
+	"errors"
+	"github.com/Aleksei-D/go-loyalty-system/internal/service"
+	"github.com/Aleksei-D/go-loyalty-system/internal/utils/common"
+	"io"
+	"net/http"
+)
+
+type OrderHandlers struct {
+	orderService *service.OrderService
+}
+
+func NewOrderHandler(orderService *service.OrderService) *OrderHandlers {
+	return &OrderHandlers{orderService: orderService}
+}
+
+func (o *OrderHandlers) APIAddOrdersHandler() func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		buf, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer r.Body.Close()
+
+		orderNumber := string(buf)
+		login, ok := r.Context().Value(common.LoginKey("login")).(string)
+		if !ok {
+			http.Error(w, "Not authorized", http.StatusUnauthorized)
+			return
+		}
+
+		_, err = o.orderService.AddOrder(r.Context(), orderNumber, login)
+		if err != nil {
+			switch {
+			case errors.Is(err, common.ErrInvalidOrderNumber):
+				http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			case errors.Is(err, common.ErrOrderBelongAnotherUser):
+				http.Error(w, err.Error(), http.StatusConflict)
+			case errors.Is(err, common.ErrOrderAlreadyAdded):
+				w.WriteHeader(http.StatusOK)
+			default:
+				http.Error(w, "adding order error", http.StatusInternalServerError)
+			}
+			return
+		}
+		w.WriteHeader(http.StatusAccepted)
+	}
+}
+
+func (o *OrderHandlers) APIGetOrdersHandler() func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		login, ok := r.Context().Value(common.LoginKey("login")).(string)
+		if !ok {
+			http.Error(w, "Not authorized", http.StatusUnauthorized)
+			return
+		}
+
+		orders, err := o.orderService.GetAllByLogin(r.Context(), login)
+		if len(orders) == 0 {
+			http.Error(w, "Orders if not load", http.StatusNoContent)
+			return
+		}
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		ordersJSON, err := json.Marshal(orders)
+		if err != nil {
+			http.Error(w, "invalid marshaling", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(ordersJSON)
+	}
+}
